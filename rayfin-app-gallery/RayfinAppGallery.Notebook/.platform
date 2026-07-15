@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Notebook",
+    "displayName": "RayfinAppGallery"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "98ee2f58-c2d3-4dfd-8bbd-7827eb669ab4"
+  }
+}
