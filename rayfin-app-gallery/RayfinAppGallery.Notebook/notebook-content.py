@@ -159,20 +159,18 @@ def list_apps(ref: str = _DEFAULT_REF, *, with_flags: bool = True) -> list[Rayfi
     return apps
 
 
-def deploy_command(slug: str, workspace_id: str | None = None, tenant_id: str | None = None) -> str:
-    """Build the non-interactive Rayfin CLI deploy command for a template."""
+def deploy_command(name: str, workspace_id: str | None = None, tenant_id: str | None = None) -> str:
+    """Build the non-interactive Rayfin CLI deploy command for a template.
+
+    Uses the documented gallery syntax: point --template at the gallery repo and
+    select the app by its display name via --template-name.
+    """
     ws = workspace_id or _current_workspace_id() or "<your-workspace-id>"
     tenant = tenant_id or _current_tenant_id() or "<your-tenant-id>"
-    template = f"{_REPO_URL}/tree/main/templates/{slug}"
     return (
-        f"npm create @microsoft/rayfin@latest -- --template {template} --yes\n"
-        f"npx rayfin up --workspace {ws} --tenant {tenant}"
+        f'npm create @microsoft/rayfin@latest -- --template {_REPO_URL} --template-name "{name}"\n'
+        f"npx rayfin up --workspace-id {ws} --tenant {tenant} -y"
     )
-
-
-def codespaces_url(slug: str) -> str:
-    """One-click GitHub Codespaces link that opens the gallery ready to deploy."""
-    return f"https://codespaces.new/{_OWNER}/{_REPO}?quickstart=1&devcontainer_path=.devcontainer/devcontainer.json&template={slug}"
 
 
 # --- Fabric context (best-effort; safe outside a notebook) ------------------
@@ -217,9 +215,9 @@ def _card_md(app: RayfinApp) -> str:
     return (
         f"### {app.name}\n{app.description}\n\n"
         f"**Fabric:** {tags or '—'} · [Template]({app.template_url})\n\n"
-        "Deploy the app front-end (Codespaces / Cloud Shell / local):\n"
-        f"```bash\n{deploy_command(app.slug)}\n```\n"
-        f"[▶ Open in GitHub Codespaces]({codespaces_url(app.slug)})\n\n---"
+        "**Deploy this app** — copy the command (hover the box → copy icon) and run it\n"
+        "in a terminal with Node 18+ (local, Azure Cloud Shell, or a Codespace):\n"
+        f"```bash\n{deploy_command(app.name)}\n```\n---"
     )
 
 
@@ -247,7 +245,7 @@ def gallery(ref: str = _DEFAULT_REF) -> None:
 def _print_catalog(apps: list[RayfinApp]) -> None:
     print(f"Awesome Rayfin gallery — {len(apps)} template(s):\n")
     for a in apps:
-        print(f"• {a.name} ({a.slug})\n    {a.description}\n    {deploy_command(a.slug)}\n")
+        print(f"• {a.name} ({a.slug})\n    {a.description}\n    {deploy_command(a.name)}\n")
 
 # METADATA ********************
 
