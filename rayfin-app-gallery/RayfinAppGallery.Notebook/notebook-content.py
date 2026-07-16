@@ -162,16 +162,19 @@ def list_apps(ref: str = _DEFAULT_REF, *, with_flags: bool = True) -> list[Rayfi
 def deploy_command(name: str, slug: str, workspace_id: str | None = None, tenant_id: str | None = None) -> str:
     """Build the non-interactive Rayfin CLI deploy commands for a template.
 
-    Three steps: scaffold into a named folder (so it is deterministic and the
-    `rayfin` CLI is installed locally), cd into it, then deploy. `rayfin up`
-    MUST run from inside the project folder — that is where the local `rayfin`
-    bin lives (running it elsewhere tries to fetch a non-existent npm package).
+    Steps: scaffold into a named folder, cd into it, ensure dependencies are
+    installed (the scaffolder auto-installs, but this is a self-healing retry in
+    case that step failed), then deploy. `rayfin up` MUST run from inside the
+    project folder — that is where the local `rayfin` bin lives (running it
+    elsewhere, or before `npm install` succeeds, tries to fetch a non-existent
+    `rayfin` npm package and 404s).
     """
     ws = workspace_id or _current_workspace_id() or "<your-workspace-id>"
     tenant = tenant_id or _current_tenant_id() or "<your-tenant-id>"
     return (
         f'npm create @microsoft/rayfin@latest -- {slug} --template {_REPO_URL} --template-name "{name}" --workspace-id {ws}\n'
         f"cd {slug}\n"
+        "npm install                       # ensure deps (local rayfin bin) are present\n"
         f"npx rayfin up --workspace-id {ws} --tenant {tenant} -y"
     )
 

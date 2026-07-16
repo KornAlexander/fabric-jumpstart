@@ -4,8 +4,8 @@ name: Rayfin App Gallery
 description: >-
   Browse the entire Awesome Rayfin template gallery from one Fabric notebook.
   Lists every full-stack Rayfin app (Fabric Entra SSO, typed data model, static
-  hosting) live from the gallery manifest, with a ready-to-run deploy command
-  and one-click Codespaces link — workspace and tenant pre-filled.
+  hosting) live from the gallery manifest, with a ready-to-run, copy-and-run
+  deploy command — workspace and tenant pre-filled.
 date_added: 07/15/2026
 workload_tags:
   - Data Engineering
@@ -14,7 +14,7 @@ scenario_tags:
 type: Demo
 source:
   repo_url: https://github.com/KornAlexander/fabric-jumpstart.git
-  repo_ref: rayfin-app-gallery-v0.3
+  repo_ref: rayfin-app-gallery-v0.4
   workspace_path: rayfin-app-gallery/
 items_in_scope:
   - Notebook
