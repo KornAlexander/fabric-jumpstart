@@ -25,8 +25,8 @@ Two-plane design (a Fabric notebook cannot run the Node/Rayfin CLI):
                   context and (optionally) provision the app's declared Fabric
                   prerequisites.
   * App plane   — handed off: emit a ready-to-run, non-interactive deploy
-                  command plus a one-click "Open in Codespaces" link that runs
-                  the Rayfin CLI where Node belongs.
+                  command (workspace + tenant pre-filled) to copy and run in a
+                  terminal with Node 18+, where the Rayfin CLI belongs.
 
 Usage inside a Fabric notebook::
 
@@ -43,7 +43,7 @@ import json
 import urllib.request
 from dataclasses import dataclass, field
 
-__all__ = ["RayfinApp", "list_apps", "deploy_command", "codespaces_url", "gallery"]
+__all__ = ["RayfinApp", "list_apps", "deploy_command", "gallery"]
 
 # --- Source of truth (always the live gallery manifest) --------------------
 _OWNER = "microsoft"
