@@ -96,6 +96,8 @@ class RayfinApp:
     path: str                       # e.g. "templates/airport-iq"
     fabric_auth: bool = True
     fabric_data: bool = False
+    fabric_storage: bool = False
+    fabric_static: bool = True
     stack: list[str] = field(default_factory=list)
 
     @property
@@ -152,14 +154,25 @@ def _parse_entries_fallback(yaml_text: str) -> list[dict]:
     return entries
 
 
-def _load_service_flags(slug: str, ref: str) -> tuple[bool, bool]:
-    """Read auth/data flags from a template's manifest.json (best-effort)."""
+def _load_service_flags(slug: str, ref: str) -> dict[str, bool]:
+    """Read the Fabric services a template declares from its manifest.json.
+
+    Best-effort: returns the declared `services` block (auth / data / storage /
+    static hosting). These describe what the Rayfin CLI provisions into the
+    workspace when the app is deployed, so the gallery can show it per app.
+    """
+    default = {"auth": True, "data": False, "storage": False, "static": True}
     try:
         text = _fetch_text(_raw_url(_SERVICE_FLAGS_PATH.format(slug=slug), ref))
         services = (json.loads(text) or {}).get("services", {})
-        return bool(services.get("auth", True)), bool(services.get("data", False))
+        return {
+            "auth": bool(services.get("auth", True)),
+            "data": bool(services.get("data", False)),
+            "storage": bool(services.get("storage", False)),
+            "static": bool(services.get("staticHosting", True)),
+        }
     except Exception:
-        return True, False
+        return default
 
 
 def list_apps(ref: str = _DEFAULT_REF, *, with_flags: bool = True) -> list[RayfinApp]:
@@ -175,15 +188,21 @@ def list_apps(ref: str = _DEFAULT_REF, *, with_flags: bool = True) -> list[Rayfi
         slug = path.split("/")[-1] if path else str(entry.get("name", "")).strip()
         if not slug:
             continue
-        auth, data = (_load_service_flags(slug, ref) if with_flags else (True, False))
+        svc = (
+            _load_service_flags(slug, ref)
+            if with_flags
+            else {"auth": True, "data": False, "storage": False, "static": True}
+        )
         apps.append(
             RayfinApp(
                 slug=slug,
                 name=str(entry.get("name", slug)),
                 description=str(entry.get("description", "")),
                 path=path or f"templates/{slug}",
-                fabric_auth=auth,
-                fabric_data=data,
+                fabric_auth=svc["auth"],
+                fabric_data=svc["data"],
+                fabric_storage=svc["storage"],
+                fabric_static=svc["static"],
             )
         )
     return apps
@@ -273,10 +292,28 @@ def _current_tenant_id() -> str | None:
         return None
 
 
+def _deploys(app: RayfinApp) -> str:
+    """Human summary of the Fabric items this app adds to the workspace.
+
+    Derived live from the app's declared services, so it reflects what the
+    Rayfin CLI actually provisions on `rayfin up` (app-dependent).
+    """
+    parts: list[str] = []
+    if app.fabric_static:
+        parts.append("a static web app")
+    if app.fabric_data:
+        parts.append("a SQL data model")
+    if app.fabric_storage:
+        parts.append("Lakehouse file storage")
+    if app.fabric_auth:
+        parts.append("Entra SSO")
+    return ", ".join(parts) if parts else "the app"
+
+
 def _card_md(app: RayfinApp, ws: str, tenant: str) -> str:
     """Render one app as a styled card: badges, numbered steps, one-shot line."""
     auth = "`Fabric auth ✓`" if app.fabric_auth else "`Local auth`"
-    data = "`Rayfin data ✓`" if app.fabric_data else "`No data model`"
+    data = "`SQL data model ✓`" if app.fabric_data else "`No data model`"
     badges = f"{auth} · {data}"
 
     steps = _deploy_steps(app.name, app.slug, ws, tenant)
@@ -290,6 +327,7 @@ def _card_md(app: RayfinApp, ws: str, tenant: str) -> str:
         f"### 📦 {app.name}\n"
         f"{app.description}\n\n"
         f"{badges} · 🔗 [View on GitHub]({app.template_url})\n\n"
+        f"🧩 **Deploys to your workspace:** {_deploys(app)}.\n\n"
         "**Get this app into your workspace** — run these four commands **one at a time** "
         "in a terminal with Node.js 18+ (local, Azure Cloud Shell, or a Codespace). "
         "Hover a code box and click the copy icon.\n\n"
