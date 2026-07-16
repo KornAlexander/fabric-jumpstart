@@ -9,6 +9,34 @@
 # META   "dependencies": {}
 # META }
 
+# MARKDOWN ********************
+
+# # 🚀 Rayfin App Gallery
+# 
+# **Deploy a full [Awesome Rayfin](https://github.com/microsoft/awesome-rayfin) app into your Fabric workspace — straight from this notebook.**
+# 
+# This gallery reads the Awesome Rayfin template manifest **live from GitHub every time you run it**, so it always shows the latest apps — no notebook update needed when a new template ships.
+# 
+# ## How it works
+# 
+# A Fabric notebook can't run the Node / Rayfin CLI itself, so deployment happens in two planes:
+# 
+# | Plane | Where | What happens |
+# | --- | --- | --- |
+# | 🗄️ **Data** | here, server-side | resolves your current workspace + tenant and pre-fills them into every command |
+# | 🖥️ **App** | your terminal | the Rayfin CLI scaffolds the source, installs dependencies, builds and uploads the app to Fabric |
+# 
+# ## What you need
+# 
+# - **Node.js 18+** and **npm** on the machine where you run the commands — local, Azure Cloud Shell, or a Codespace
+# - Access to the target Fabric workspace (this notebook fills in its id automatically)
+# 
+# ## How to use it
+# 
+# 1. Run the cell below — it renders one card per app.
+# 2. Pick an app and copy its numbered commands (hover a code box → click the copy icon).
+# 3. Paste them into a terminal and run them **one at a time**, or use the single chained command for a one-shot paste.
+
 # CELL ********************
 
 """Awesome Rayfin — Fabric Jumpstart wrapper.
@@ -32,9 +60,11 @@ Usage inside a Fabric notebook::
 
     %pip install fabric-jumpstart-rayfin --quiet
     import rayfin_jumpstart as rj
-    rj.gallery()                       # interactive picker (ipywidgets)
-    # or headless:
-    print(rj.deploy_command("airport-iq"))
+    rj.gallery()                       # render every app as a card
+    # or headless (four commands, run one at a time):
+    print(rj.deploy_command("Airport IQ", "airport-iq"))
+    # or as a single chained one-liner:
+    print(rj.deploy_command_chained("Airport IQ", "airport-iq"))
 """
 
 from __future__ import annotations
@@ -43,7 +73,7 @@ import json
 import urllib.request
 from dataclasses import dataclass, field
 
-__all__ = ["RayfinApp", "list_apps", "deploy_command", "gallery"]
+__all__ = ["RayfinApp", "list_apps", "deploy_command", "deploy_command_chained", "gallery"]
 
 # --- Source of truth (always the live gallery manifest) --------------------
 _OWNER = "microsoft"
@@ -179,6 +209,35 @@ def deploy_command(name: str, slug: str, workspace_id: str | None = None, tenant
     )
 
 
+def _deploy_steps(name: str, slug: str, ws: str, tenant: str) -> list[tuple[str, str]]:
+    """The four ordered commands to get one app into a workspace.
+
+    Each is a standalone shell command meant to be run **one at a time** from a
+    terminal with Node 18+. Scaffolding into the named `{slug}` folder makes the
+    subsequent `cd` deterministic (no guessing the folder the CLI created).
+    """
+    return [
+        (
+            "Scaffold the app",
+            f'npm create @microsoft/rayfin@latest -- {slug} --template {_REPO_URL} --template-name "{name}" --workspace-id {ws}',
+        ),
+        ("Enter the project folder", f"cd {slug}"),
+        ("Install dependencies", "npm install"),
+        ("Deploy to your Fabric workspace", f"npx rayfin up --workspace-id {ws} --tenant {tenant} -y"),
+    ]
+
+
+def deploy_command_chained(name: str, slug: str, workspace_id: str | None = None, tenant_id: str | None = None) -> str:
+    """Same four steps as :func:`deploy_command`, chained into ONE line.
+
+    Uses ``&&`` so the chain stops at the first failing step — a convenient
+    single paste for when you don't want to run the commands individually.
+    """
+    ws = workspace_id or _current_workspace_id() or "<your-workspace-id>"
+    tenant = tenant_id or _current_tenant_id() or "<your-tenant-id>"
+    return " && ".join(cmd for _, cmd in _deploy_steps(name, slug, ws, tenant))
+
+
 # --- Fabric context (best-effort; safe outside a notebook) ------------------
 def _current_workspace_id() -> str | None:
     try:
@@ -214,16 +273,30 @@ def _current_tenant_id() -> str | None:
         return None
 
 
-def _card_md(app: RayfinApp) -> str:
-    tags = " · ".join(
-        t for t in ["Auth" if app.fabric_auth else None, "Data" if app.fabric_data else None] if t
+def _card_md(app: RayfinApp, ws: str, tenant: str) -> str:
+    """Render one app as a styled card: badges, numbered steps, one-shot line."""
+    auth = "`Fabric auth ✓`" if app.fabric_auth else "`Local auth`"
+    data = "`Rayfin data ✓`" if app.fabric_data else "`No data model`"
+    badges = f"{auth} · {data}"
+
+    steps = _deploy_steps(app.name, app.slug, ws, tenant)
+    step_md = "\n".join(
+        f"**{i} · {title}**\n```bash\n{cmd}\n```"
+        for i, (title, cmd) in enumerate(steps, start=1)
     )
+    chained = deploy_command_chained(app.name, app.slug, ws, tenant)
+
     return (
-        f"### {app.name}\n{app.description}\n\n"
-        f"**Fabric:** {tags or '—'} · [Template]({app.template_url})\n\n"
-        "**Deploy this app** — copy the commands (hover the box → copy icon) and run them\n"
-        "in a terminal with Node 18+ (local, Azure Cloud Shell, or a Codespace):\n"
-        f"```bash\n{deploy_command(app.name, app.slug)}\n```\n---"
+        f"### 📦 {app.name}\n"
+        f"{app.description}\n\n"
+        f"{badges} · 🔗 [View on GitHub]({app.template_url})\n\n"
+        "**Get this app into your workspace** — run these four commands **one at a time** "
+        "in a terminal with Node.js 18+ (local, Azure Cloud Shell, or a Codespace). "
+        "Hover a code box and click the copy icon.\n\n"
+        f"{step_md}\n\n"
+        "**Prefer a single paste?** Run all four chained — it stops if any step fails:\n"
+        f"```bash\n{chained}\n```\n"
+        "---"
     )
 
 
@@ -242,10 +315,17 @@ def gallery(ref: str = _DEFAULT_REF) -> None:
     ws = _current_workspace_id() or "<your-workspace-id>"
     tn = _current_tenant_id() or "<your-tenant-id>"
     header = (
-        f"# Rayfin App Gallery\n"
-        f"**{len(apps)} templates** · workspace `{ws}` · tenant `{tn}`\n\n---"
+        "# 🚀 Rayfin App Gallery\n"
+        f"Deploy a full [Awesome Rayfin]({_REPO_URL}) app into your Fabric workspace. "
+        "This list is generated **live** from the gallery manifest, so it always "
+        "reflects the latest templates.\n\n"
+        f"**{len(apps)} apps** · workspace `{ws}` · tenant `{tn}`\n\n"
+        "> **How it works** — a Fabric notebook can't run the Node / Rayfin CLI, so each "
+        "card hands you a ready-to-run deploy command (workspace + tenant pre-filled). "
+        "Copy it, run it in a terminal with **Node.js 18+**, and the Rayfin CLI scaffolds, "
+        "builds and uploads the app to your workspace.\n\n---"
     )
-    display(Markdown(header + "\n\n" + "\n\n".join(_card_md(a) for a in apps)))
+    display(Markdown(header + "\n\n" + "\n\n".join(_card_md(a, ws, tn) for a in apps)))
 
 
 def _print_catalog(apps: list[RayfinApp]) -> None:

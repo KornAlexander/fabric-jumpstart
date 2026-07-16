@@ -14,7 +14,7 @@ scenario_tags:
 type: Demo
 source:
   repo_url: https://github.com/KornAlexander/fabric-jumpstart.git
-  repo_ref: rayfin-app-gallery-v0.5
+  repo_ref: rayfin-app-gallery-v0.6
   workspace_path: rayfin-app-gallery/
 items_in_scope:
   - Notebook
